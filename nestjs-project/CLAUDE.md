@@ -7,14 +7,16 @@
 After starting infrastructure, always confirm the containers are up before proceeding:
 
 ```bash
-docker compose ps   # all services must show status "running"
+docker compose ps   # infrastructure services must show status "running" / healthy
 ```
 
 Then verify each infrastructure service is actually ready to accept connections — not just running:
 
 - **PostgreSQL:** `docker compose exec db pg_isready -U streamtube` — expect `accepting connections`
+- **Redis:** `docker compose exec redis redis-cli ping` — expect `PONG`
+- **MinIO (storage):** S3 API on Compose service `storage:9000` (console mapped on host `9001`)
 
-Only start the NestJS dev server (`npm run start:dev`) when the user **explicitly** asks to run the application — never as part of "start the environment".
+Only start the NestJS API (`npm run start:dev`) or the video worker when the user **explicitly** asks to run the application — never as part of "start the environment".
 
 ## Development Environment
 
@@ -34,6 +36,10 @@ docker compose exec nestjs-api npm run start:dev
 Services:
 - `nestjs-api` — NestJS API, port `3000`
 - `db` — PostgreSQL 17, port `5432`, database `streamtube`, user/password `streamtube`
+- `mailpit` — local SMTP (`1025`) + UI (`8025`)
+- `redis` — BullMQ broker, port `6379` (Compose host `QUEUE_HOST=redis`)
+- `storage` — MinIO S3 API (`9000`) + console (`9001`); buckets `streamtube-videos` / `streamtube-thumbnails`
+- `video-worker` — separate Nest application context (`src/worker.ts` via `Dockerfile.worker`); consumes `video.processing` jobs, runs FFmpeg/ffprobe
 
 All verification and teardown commands run on the **host machine**:
 
@@ -44,9 +50,15 @@ curl http://localhost:3000
 # Verify PostgreSQL is ready (runs inside the db container)
 docker compose exec db pg_isready -U streamtube
 
+# Verify Redis is ready
+docker compose exec redis redis-cli ping
+
 # Check container logs
 docker compose logs nestjs-api
 docker compose logs db
+docker compose logs video-worker
+docker compose logs storage
+docker compose logs redis
 
 # Tear down the entire environment
 docker compose down
@@ -148,6 +160,15 @@ NestJS with standard module structure. Source lives in `src/`, compiled output i
 
 - Each domain feature gets its own module (e.g., `UsersModule`, `VideosModule`) registered in `AppModule`
 - Controllers handle HTTP routing; Services hold business logic; both are scoped to their module
+
+### Videos
+
+- Public routes use opaque `public_token` (64 hex chars), never the internal UUID `id`
+- Status flow: `draft` → `processing` → `ready` | `failed`
+- Multipart upload: client PUTs parts to MinIO via presigned URLs; API only initiates, signs parts, and completes
+- `VideosModule` (API) enqueues BullMQ jobs; `VideosWorkerModule` + `src/worker.ts` process them — do not register `VideoProcessor` in the API module
+- Jobs use `VIDEO_PROCESSING_JOB_OPTIONS` (3 attempts, exponential backoff). The processor rethrows on earlier attempts and only writes `failed` + `failure_reason` on the last one
+- Playback/download return short-lived presigned GETs; only `ready` videos are playable/downloadable
 
 ## Code Conventions
 
