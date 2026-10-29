@@ -11,6 +11,23 @@ import { MAIL_SUBJECTS } from './mail.constants';
 import { MailModule } from './mail.module';
 import { MailService } from './mail.service';
 
+type MailpitMessageSummary = {
+  ID: string;
+  To: { Address: string }[];
+  From: { Address: string };
+  Subject: string;
+};
+
+type MailpitMessage = { HTML: string };
+
+async function fetchMessages(): Promise<MailpitMessageSummary[]> {
+  return (await getMailpitMessages()) as MailpitMessageSummary[];
+}
+
+async function fetchMessage(id: string): Promise<MailpitMessage> {
+  return (await getMailpitMessage(id)) as MailpitMessage;
+}
+
 describe('MailService (integration)', () => {
   let mailService: MailService;
 
@@ -36,7 +53,7 @@ describe('MailService (integration)', () => {
       'token123',
     );
 
-    const messages = await getMailpitMessages();
+    const messages = await fetchMessages();
     expect(messages).toHaveLength(1);
     expect(messages[0].To[0].Address).toBe('user@example.com');
     expect(messages[0].Subject).toBe(MAIL_SUBJECTS.CONFIRMATION);
@@ -49,8 +66,8 @@ describe('MailService (integration)', () => {
       'mytoken',
     );
 
-    const messages = await getMailpitMessages();
-    const detail = await getMailpitMessage(messages[0].ID);
+    const messages = await fetchMessages();
+    const detail = await fetchMessage(messages[0].ID);
 
     expect(detail.HTML).toContain('mytoken');
     expect(detail.HTML).toContain('Alice');
@@ -64,7 +81,7 @@ describe('MailService (integration)', () => {
       'resettoken',
     );
 
-    const messages = await getMailpitMessages();
+    const messages = await fetchMessages();
     expect(messages).toHaveLength(1);
     expect(messages[0].To[0].Address).toBe('user@example.com');
     expect(messages[0].Subject).toBe(MAIL_SUBJECTS.PASSWORD_RESET);
@@ -77,8 +94,8 @@ describe('MailService (integration)', () => {
       'resettoken',
     );
 
-    const messages = await getMailpitMessages();
-    const detail = await getMailpitMessage(messages[0].ID);
+    const messages = await fetchMessages();
+    const detail = await fetchMessage(messages[0].ID);
 
     expect(detail.HTML).toContain('resettoken');
     expect(detail.HTML).toContain('Bob');
@@ -89,7 +106,7 @@ describe('MailService (integration)', () => {
   it('both emails use the configured MAIL_FROM address as sender', async () => {
     await mailService.sendConfirmationEmail('user@example.com', 'Alice', 'tok');
 
-    const messages = await getMailpitMessages();
+    const messages = await fetchMessages();
     const configuredFrom =
       process.env.MAIL_FROM ?? '"StreamTube" <noreply@streamtube.com>';
     const expectedAddress =

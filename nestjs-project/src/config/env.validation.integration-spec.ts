@@ -6,6 +6,12 @@ const requiredEnv = {
   DB_NAME: 'db',
   JWT_SECRET: 'secret',
   JWT_REFRESH_SECRET: 'refresh-secret',
+  STORAGE_ENDPOINT: 'http://storage:9000',
+  STORAGE_ACCESS_KEY: 'streamtube',
+  STORAGE_SECRET_KEY: 'streamtube-secret',
+  STORAGE_VIDEO_BUCKET: 'streamtube-videos',
+  STORAGE_THUMBNAIL_BUCKET: 'streamtube-thumbnails',
+  QUEUE_HOST: 'redis',
 };
 
 const validate = (env: Record<string, string>) =>
@@ -32,8 +38,9 @@ describe('envValidationSchema — SWAGGER_ENABLED', () => {
   });
 
   it('should apply default false when SWAGGER_ENABLED is not set', () => {
-    const { value, error } = validate({});
-    expect(error).toBeUndefined();
+    const result = validate({});
+    const value = result.value as { SWAGGER_ENABLED: string };
+    expect(result.error).toBeUndefined();
     expect(value.SWAGGER_ENABLED).toBe('false');
   });
 });
