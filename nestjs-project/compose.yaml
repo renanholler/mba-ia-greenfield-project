@@ -7,10 +7,23 @@ services:
       - 3000:3000
     volumes:
       - .:/home/node/app
+    environment:
+      STORAGE_ENDPOINT: http://storage:9000
+      STORAGE_ACCESS_KEY: streamtube
+      STORAGE_SECRET_KEY: streamtube-secret
+      STORAGE_REGION: us-east-1
+      STORAGE_VIDEO_BUCKET: streamtube-videos
+      STORAGE_THUMBNAIL_BUCKET: streamtube-thumbnails
+      QUEUE_HOST: redis
+      QUEUE_PORT: 6379
     depends_on:
       db:
         condition: service_healthy
       mailpit:
+        condition: service_started
+      redis:
+        condition: service_started
+      storage:
         condition: service_started
 
   db:
@@ -32,5 +45,50 @@ services:
     ports:
       - "1025:1025"
       - "8025:8025"
+
+  storage:
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: streamtube
+      MINIO_ROOT_PASSWORD: streamtube-secret
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  video-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    command: ["npx", "ts-node", "-r", "tsconfig-paths/register", "src/worker.ts"]
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: streamtube
+      DB_PASSWORD: streamtube
+      DB_NAME: streamtube
+      JWT_SECRET: change-me-in-production
+      JWT_REFRESH_SECRET: change-me-refresh-in-production
+      STORAGE_ENDPOINT: http://storage:9000
+      STORAGE_ACCESS_KEY: streamtube
+      STORAGE_SECRET_KEY: streamtube-secret
+      STORAGE_REGION: us-east-1
+      STORAGE_VIDEO_BUCKET: streamtube-videos
+      STORAGE_THUMBNAIL_BUCKET: streamtube-thumbnails
+      QUEUE_HOST: redis
+      QUEUE_PORT: 6379
+    volumes:
+      - .:/home/node/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      storage:
+        condition: service_started
 
 
