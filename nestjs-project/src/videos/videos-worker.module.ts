@@ -6,6 +6,8 @@ import databaseConfig from '../config/database.config';
 import queueConfig from '../config/queue.config';
 import storageConfig from '../config/storage.config';
 import { envValidationSchema } from '../config/env.validation';
+import { Channel } from '../channels/entities/channel.entity';
+import { User } from '../users/entities/user.entity';
 import { VIDEO_QUEUE } from './videos.constants';
 import { Video } from './entities/video.entity';
 import { StorageService } from './storage/storage.service';
@@ -30,7 +32,8 @@ import { VideoProcessor } from './video.processor';
         username: dbConfig.username,
         password: dbConfig.password,
         database: dbConfig.name,
-        autoLoadEntities: true,
+        /** Video's relations must resolve even though the worker only queries videos */
+        entities: [Video, Channel, User],
         synchronize: false,
       }),
     }),
