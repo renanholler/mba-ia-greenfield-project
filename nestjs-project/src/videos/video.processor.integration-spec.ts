@@ -16,6 +16,16 @@ import { VideoProcessor } from './video.processor';
 
 const ALL_ENTITIES = [User, Channel, RefreshToken, VerificationToken, Video];
 
+const SAMPLE_METADATA = {
+  format_name: 'mov,mp4,m4a,3gp,3g2,mj2',
+  bit_rate: 1200000,
+  width: 1280,
+  height: 720,
+  frame_rate: 30,
+  video_codec: 'h264',
+  audio_codec: 'aac',
+};
+
 function buildJob(videoId: string, attemptsMade = 0): Job {
   return {
     name: 'video.processing',
@@ -33,7 +43,7 @@ describe('VideoProcessor (integration)', () => {
   let storageService: StorageService;
   let processor: VideoProcessor;
   let media: {
-    extractDurationSeconds: jest.Mock;
+    probe: jest.Mock;
     extractThumbnailJpeg: jest.Mock;
   };
 
@@ -46,6 +56,7 @@ describe('VideoProcessor (integration)', () => {
 
     storageService = new StorageService({
       endpoint: process.env.STORAGE_ENDPOINT!,
+      publicEndpoint: process.env.STORAGE_ENDPOINT!,
       accessKey: process.env.STORAGE_ACCESS_KEY!,
       secretKey: process.env.STORAGE_SECRET_KEY!,
       region: process.env.STORAGE_REGION ?? 'us-east-1',
@@ -55,7 +66,9 @@ describe('VideoProcessor (integration)', () => {
     await storageService.onModuleInit();
 
     media = {
-      extractDurationSeconds: jest.fn().mockResolvedValue(15),
+      probe: jest
+        .fn()
+        .mockResolvedValue({ durationSeconds: 15, metadata: SAMPLE_METADATA }),
       extractThumbnailJpeg: jest.fn().mockResolvedValue(Buffer.from('jpeg')),
     };
 
@@ -73,7 +86,10 @@ describe('VideoProcessor (integration)', () => {
   beforeEach(async () => {
     await cleanAllTables(dataSource);
     jest.clearAllMocks();
-    media.extractDurationSeconds.mockResolvedValue(15);
+    media.probe.mockResolvedValue({
+      durationSeconds: 15,
+      metadata: SAMPLE_METADATA,
+    });
     media.extractThumbnailJpeg.mockResolvedValue(Buffer.from('jpeg'));
   });
 
@@ -107,6 +123,7 @@ describe('VideoProcessor (integration)', () => {
         public_token: publicToken,
         channel_id: channel.id,
         status: VideoStatus.PROCESSING,
+        title: 'Clip',
         original_filename: 'clip.mp4',
         content_type: 'video/mp4',
         size_bytes: '128',
@@ -123,6 +140,7 @@ describe('VideoProcessor (integration)', () => {
     const updated = await videoRepository.findOneByOrFail({ id: video.id });
     expect(updated.status).toBe(VideoStatus.READY);
     expect(updated.duration_seconds).toBe(15);
+    expect(updated.metadata).toEqual(SAMPLE_METADATA);
     expect(updated.thumbnail_object_key).toBe(
       `${video.public_token}/thumbnail.jpg`,
     );
@@ -136,7 +154,7 @@ describe('VideoProcessor (integration)', () => {
 
   it('marks failed and keeps the video object when the last attempt fails', async () => {
     const video = await seedProcessingVideo();
-    media.extractDurationSeconds.mockRejectedValue(new Error('boom'));
+    media.probe.mockRejectedValue(new Error('boom'));
 
     await processor.process(buildJob(video.id, 2));
 
@@ -156,7 +174,10 @@ describe('VideoProcessor (integration)', () => {
     await processor.process(buildJob(video.id));
     const ready = await videoRepository.findOneByOrFail({ id: video.id });
 
-    media.extractDurationSeconds.mockResolvedValue(99);
+    media.probe.mockResolvedValue({
+      durationSeconds: 99,
+      metadata: SAMPLE_METADATA,
+    });
     await processor.process(buildJob(video.id));
 
     const again = await videoRepository.findOneByOrFail({ id: video.id });

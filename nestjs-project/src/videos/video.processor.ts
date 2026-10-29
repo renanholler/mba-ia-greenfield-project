@@ -56,8 +56,8 @@ export class VideoProcessor extends WorkerHost {
         sourcePath,
       );
 
-      const durationSeconds =
-        await this.videoMediaService.extractDurationSeconds(sourcePath);
+      const { durationSeconds, metadata } =
+        await this.videoMediaService.probe(sourcePath);
       const thumbnailBytes =
         await this.videoMediaService.extractThumbnailJpeg(sourcePath);
 
@@ -70,6 +70,7 @@ export class VideoProcessor extends WorkerHost {
       );
 
       video.duration_seconds = durationSeconds;
+      video.metadata = metadata;
       video.thumbnail_object_key = thumbnailObjectKey;
       video.status = VideoStatus.READY;
       video.failure_reason = null;

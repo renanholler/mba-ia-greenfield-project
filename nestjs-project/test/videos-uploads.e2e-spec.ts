@@ -82,6 +82,7 @@ describe('videos-uploads', () => {
   }
 
   const validBody = {
+    title: 'Clip',
     original_filename: 'clip.mp4',
     content_type: 'video/mp4',
     size_bytes: 1024,
@@ -120,6 +121,7 @@ describe('videos-uploads', () => {
     });
     expect(row).not.toBeNull();
     expect(row!.channel_id).toBe(row!.channel.id);
+    expect(row!.title).toBe('Clip');
     expect(row!.id).not.toBe(row!.public_token);
     expect(row!.thumbnail_object_key).toBeNull();
     expect(row!.duration_seconds).toBeNull();
@@ -160,5 +162,20 @@ describe('videos-uploads', () => {
       .expect(400);
 
     expect((res.body as ErrorBody).error).toBe('VALIDATION_ERROR');
+  });
+
+  it('reject-missing-title', async () => {
+    const accessToken = await registerConfirmAndLogin('notitle@example.com');
+    const bodyWithoutTitle: Partial<typeof validBody> = { ...validBody };
+    delete bodyWithoutTitle.title;
+
+    const res = await request(app.getHttpServer())
+      .post('/videos/uploads')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(bodyWithoutTitle)
+      .expect(400);
+
+    expect((res.body as ErrorBody).error).toBe('VALIDATION_ERROR');
+    expect(await videoRepository.count()).toBe(0);
   });
 });

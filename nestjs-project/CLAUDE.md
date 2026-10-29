@@ -163,12 +163,27 @@ NestJS with standard module structure. Source lives in `src/`, compiled output i
 
 ### Videos
 
+Endpoints (`src/videos/videos.controller.ts`):
+
+| Method | Route | Auth | Result |
+|--------|-------|------|--------|
+| POST | `/videos/uploads` | Bearer | `201` — creates the `draft` row (`title`, `original_filename`, `content_type`, `size_bytes` ≤ 10GB) and the multipart upload |
+| POST | `/videos/:publicToken/parts` | Bearer, owner | `200` — presigned PUT URL per part number |
+| POST | `/videos/:publicToken/complete` | Bearer, owner | `202` — completes the multipart upload, sets `processing`, enqueues `video.processing` |
+| GET | `/videos/:publicToken` | Public (owner sees non-`ready`) | `200` — `title`, `status`, `duration_seconds`, `metadata`, `thumbnail_url` |
+| GET | `/videos/:publicToken/playback` | Public | `200` — presigned GET; storage answers Range requests with `206` |
+| GET | `/videos/:publicToken/download` | Public | `200` — presigned GET with `Content-Disposition: attachment` |
+
 - Public routes use opaque `public_token` (64 hex chars), never the internal UUID `id`
 - Status flow: `draft` → `processing` → `ready` | `failed`
 - Multipart upload: client PUTs parts to MinIO via presigned URLs; API only initiates, signs parts, and completes
-- `VideosModule` (API) enqueues BullMQ jobs; `VideosWorkerModule` + `src/worker.ts` process them — do not register `VideoProcessor` in the API module
+- Storage (`StorageService`): buckets `STORAGE_VIDEO_BUCKET` (source at `<public_token>/source`) and `STORAGE_THUMBNAIL_BUCKET` (`<public_token>/thumbnail.jpg`). Server calls use `STORAGE_ENDPOINT` (`http://storage:9000`); presigned URLs are signed against `STORAGE_PUBLIC_ENDPOINT` (`http://localhost:9000`) so the client can reach them, falling back to `STORAGE_ENDPOINT` when unset
+- `VideosModule` (API) enqueues BullMQ jobs; `VideosWorkerModule` + `src/worker.ts` process them in the `video-worker` container (FFmpeg) — do not register `VideoProcessor` in the API module
+- The worker's TypeORM config lists `Video`, `Channel` and `User` explicitly; any new relation on `Video` must be added there too, or the worker fails to start
+- The worker runs `ffprobe` once (`VideoMediaService.probe`) to store `duration_seconds` and `metadata` (format, bitrate, resolution, frame rate, codecs), then grabs a thumbnail frame with `ffmpeg`
 - Jobs use `VIDEO_PROCESSING_JOB_OPTIONS` (3 attempts, exponential backoff). The processor rethrows on earlier attempts and only writes `failed` + `failure_reason` on the last one
 - Playback/download return short-lived presigned GETs; only `ready` videos are playable/downloadable
+- `video-worker` runs `ts-node` without watch mode: restart it (`docker compose restart video-worker`) after changing worker code
 
 ## Code Conventions
 

@@ -36,6 +36,7 @@ describe('VideosService (integration)', () => {
 
     const storageService = new StorageService({
       endpoint: process.env.STORAGE_ENDPOINT!,
+      publicEndpoint: process.env.STORAGE_ENDPOINT!,
       accessKey: process.env.STORAGE_ACCESS_KEY!,
       secretKey: process.env.STORAGE_SECRET_KEY!,
       region: process.env.STORAGE_REGION ?? 'us-east-1',
@@ -95,6 +96,7 @@ describe('VideosService (integration)', () => {
     const { user, channel } = await createUserWithChannel();
 
     const result = await service.initiate(user.id, {
+      title: 'Clip',
       original_filename: 'clip.mp4',
       content_type: 'video/mp4',
       size_bytes: 2048,
@@ -119,6 +121,7 @@ describe('VideosService (integration)', () => {
 
     await expect(
       service.initiate(user.id, {
+        title: 'Clip',
         original_filename: 'huge.mp4',
         content_type: 'video/mp4',
         size_bytes: MAX_UPLOAD_BYTES + 1,
@@ -131,6 +134,7 @@ describe('VideosService (integration)', () => {
   it('signs parts for a draft without changing status', async () => {
     const { user } = await createUserWithChannel();
     const initiated = await service.initiate(user.id, {
+      title: 'Clip',
       original_filename: 'clip.mp4',
       content_type: 'video/mp4',
       size_bytes: 2048,
@@ -155,6 +159,7 @@ describe('VideosService (integration)', () => {
   it('completes multipart upload, clears multipart id, and enqueues processing job', async () => {
     const { user } = await createUserWithChannel();
     const initiated = await service.initiate(user.id, {
+      title: 'Clip',
       original_filename: 'clip.mp4',
       content_type: 'video/mp4',
       size_bytes: 64,

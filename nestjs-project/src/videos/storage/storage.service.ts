@@ -24,17 +24,26 @@ export type StorageConfig = ConfigType<typeof storageConfig>;
 @Injectable()
 export class StorageService implements OnModuleInit {
   private readonly client: S3Client;
+  /** Signs URLs with the host the caller can reach; signing does no network I/O */
+  private readonly presignClient: S3Client;
 
   constructor(
     @Inject(storageConfig.KEY)
     private readonly storage: StorageConfig,
   ) {
-    this.client = new S3Client({
-      endpoint: storage.endpoint,
-      region: storage.region,
+    this.client = this.createClient(storage.endpoint);
+    this.presignClient = this.createClient(
+      storage.publicEndpoint ?? storage.endpoint,
+    );
+  }
+
+  private createClient(endpoint: string): S3Client {
+    return new S3Client({
+      endpoint,
+      region: this.storage.region,
       credentials: {
-        accessKeyId: storage.accessKey,
-        secretAccessKey: storage.secretKey,
+        accessKeyId: this.storage.accessKey,
+        secretAccessKey: this.storage.secretKey,
       },
       forcePathStyle: true,
     });
@@ -89,7 +98,7 @@ export class StorageService implements OnModuleInit {
     partNumber: number,
   ): Promise<string> {
     return getSignedUrl(
-      this.client,
+      this.presignClient,
       new UploadPartCommand({
         Bucket: this.storage.videoBucket,
         Key: objectKey,
@@ -126,7 +135,7 @@ export class StorageService implements OnModuleInit {
     contentDisposition?: string,
   ): Promise<string> {
     return getSignedUrl(
-      this.client,
+      this.presignClient,
       new GetObjectCommand({
         Bucket: bucket,
         Key: objectKey,

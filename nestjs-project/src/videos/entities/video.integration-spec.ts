@@ -58,6 +58,7 @@ describe('Video entity (integration)', () => {
   ): Video {
     return videoRepository.create({
       channel_id: channelId,
+      title: 'Clip',
       original_filename: 'clip.mp4',
       content_type: 'video/mp4',
       size_bytes: '1024',

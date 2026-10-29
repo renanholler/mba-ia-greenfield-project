@@ -90,6 +90,7 @@ describe('videos-download', () => {
         public_token: publicToken,
         channel_id: channel.id,
         status,
+        title: 'Clip',
         original_filename: filename,
         content_type: 'video/mp4',
         size_bytes: '32',

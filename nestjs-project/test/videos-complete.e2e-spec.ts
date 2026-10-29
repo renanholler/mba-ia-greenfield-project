@@ -27,6 +27,9 @@ describe('videos-complete', () => {
   let videoQueue: Queue<VideoProcessingJobData>;
 
   beforeAll(async () => {
+    // This suite PUTs bytes to the signed URL from inside the Compose network,
+    // where the browser-facing STORAGE_PUBLIC_ENDPOINT host is not reachable.
+    process.env.STORAGE_PUBLIC_ENDPOINT = process.env.STORAGE_ENDPOINT;
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -88,6 +91,7 @@ describe('videos-complete', () => {
       .post('/videos/uploads')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
+        title: 'Clip',
         original_filename: 'clip.mp4',
         content_type: 'video/mp4',
         size_bytes: 64,

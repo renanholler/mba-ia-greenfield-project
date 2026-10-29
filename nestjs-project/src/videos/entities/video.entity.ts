@@ -11,6 +11,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Channel } from '../../channels/entities/channel.entity';
+import type { VideoMetadata } from './video-metadata';
 import { VideoStatus } from './video-status';
 
 @Entity('videos')
@@ -29,6 +30,9 @@ export class Video {
   status: VideoStatus;
 
   @Column({ type: 'varchar', length: 255 })
+  title: string;
+
+  @Column({ type: 'varchar', length: 255 })
   original_filename: string;
 
   @Column({ type: 'varchar', length: 255 })
@@ -45,6 +49,9 @@ export class Video {
 
   @Column({ type: 'integer', nullable: true })
   duration_seconds: number | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  metadata: VideoMetadata | null;
 
   @Column({ type: 'varchar', length: 1024, nullable: true })
   multipart_upload_id: string | null;

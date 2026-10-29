@@ -20,8 +20,10 @@ type MeBody = { sub: string; email: string };
 type VideoBody = {
   id?: string;
   public_token: string;
+  title: string;
   status: string;
   duration_seconds: number | null;
+  metadata: Record<string, unknown> | null;
   thumbnail_url: string | null;
   failure_reason?: string | null;
 };
@@ -123,6 +125,7 @@ describe('videos-id', () => {
         public_token: publicToken,
         channel_id: channel.id,
         status,
+        title: 'Clip',
         original_filename: 'clip.mp4',
         content_type: 'video/mp4',
         size_bytes: '10',
@@ -133,8 +136,18 @@ describe('videos-id', () => {
   }
 
   it('anonymous-reads-ready-video', async () => {
+    const metadata = {
+      format_name: 'mov,mp4,m4a,3gp,3g2,mj2',
+      bit_rate: 1200000,
+      width: 1280,
+      height: 720,
+      frame_rate: 30,
+      video_codec: 'h264',
+      audio_codec: 'aac',
+    };
     const video = await seedVideo(VideoStatus.READY, {
       duration_seconds: 12,
+      metadata,
       thumbnail_object_key: `thumb_${counter}.jpg`,
     });
 
@@ -144,8 +157,10 @@ describe('videos-id', () => {
 
     const body = res.body as VideoBody;
     expect(body.public_token).toBe(video.public_token);
+    expect(body.title).toBe('Clip');
     expect(body.status).toBe('ready');
     expect(body.duration_seconds).toBe(12);
+    expect(body.metadata).toEqual(metadata);
     expect(typeof body.thumbnail_url).toBe('string');
     expect(body.id).toBeUndefined();
   });
@@ -175,6 +190,7 @@ describe('videos-id', () => {
         public_token: publicToken,
         channel_id: channel.id,
         status: VideoStatus.FAILED,
+        title: 'Clip',
         original_filename: 'clip.mp4',
         content_type: 'video/mp4',
         size_bytes: '10',

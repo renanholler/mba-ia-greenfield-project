@@ -78,6 +78,7 @@ describe('VideosService (unit)', () => {
   it('rejects size_bytes above 10GB with UPLOAD_TOO_LARGE and does not touch storage or DB', async () => {
     await expect(
       service.initiate('user-1', {
+        title: 'Clip',
         original_filename: 'big.mp4',
         content_type: 'video/mp4',
         size_bytes: MAX_UPLOAD_BYTES + 1,
@@ -91,6 +92,7 @@ describe('VideosService (unit)', () => {
 
   it('creates draft video after opening multipart upload', async () => {
     const result = await service.initiate('user-1', {
+      title: 'Clip',
       original_filename: 'clip.mp4',
       content_type: 'video/mp4',
       size_bytes: 1024,
@@ -108,6 +110,7 @@ describe('VideosService (unit)', () => {
 
     await expect(
       service.initiate('user-1', {
+        title: 'Clip',
         original_filename: 'clip.mp4',
         content_type: 'video/mp4',
         size_bytes: 1024,
@@ -252,6 +255,7 @@ describe('VideosService (unit)', () => {
       videoRepository.findOneBy.mockResolvedValue({
         status: VideoStatus.READY,
         object_key: 'tok/source',
+        title: 'Clip',
         original_filename: 'clip.mp4',
       });
 

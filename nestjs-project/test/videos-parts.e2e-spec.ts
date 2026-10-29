@@ -79,6 +79,7 @@ describe('videos-parts', () => {
       .post('/videos/uploads')
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
+        title: 'Clip',
         original_filename: 'clip.mp4',
         content_type: 'video/mp4',
         size_bytes: 1024,

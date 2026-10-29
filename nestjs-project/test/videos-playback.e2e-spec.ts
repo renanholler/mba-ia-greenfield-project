@@ -87,6 +87,7 @@ describe('videos-playback', () => {
         public_token: publicToken,
         channel_id: channel.id,
         status,
+        title: 'Clip',
         original_filename: 'clip.mp4',
         content_type: 'video/mp4',
         size_bytes: '32',
@@ -104,7 +105,11 @@ describe('videos-playback', () => {
 
     const body = res.body as UrlBody;
     expect(typeof body.url).toBe('string');
-    expect(body.url.length).toBeGreaterThan(0);
+    expect(new URL(body.url).origin).toBe(
+      new URL(
+        process.env.STORAGE_PUBLIC_ENDPOINT ?? process.env.STORAGE_ENDPOINT!,
+      ).origin,
+    );
     expect(Buffer.isBuffer(body)).toBe(false);
     expect(JSON.stringify(body).includes('\u0003')).toBe(false);
   });

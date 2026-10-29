@@ -5,6 +5,11 @@ export class InitiateUploadDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
+  title: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
   original_filename: string;
 
   @IsString()

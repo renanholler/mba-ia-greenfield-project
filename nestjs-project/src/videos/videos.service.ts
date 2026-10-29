@@ -19,10 +19,12 @@ import {
   VIDEO_QUEUE,
 } from './videos.constants';
 import { Video } from './entities/video.entity';
+import type { VideoMetadata } from './entities/video-metadata';
 import { VideoStatus } from './entities/video-status';
 import { StorageService } from './storage/storage.service';
 
 export type InitiateUploadInput = {
+  title: string;
   original_filename: string;
   content_type: string;
   size_bytes: number;
@@ -71,6 +73,7 @@ export class VideosService {
           public_token: publicToken,
           channel_id: channel.id,
           status: VideoStatus.DRAFT,
+          title: input.title,
           original_filename: input.original_filename,
           content_type: input.content_type,
           size_bytes: String(input.size_bytes),
@@ -177,8 +180,10 @@ export class VideosService {
     viewerUserId?: string,
   ): Promise<{
     public_token: string;
+    title: string;
     status: VideoStatus;
     duration_seconds: number | null;
+    metadata: VideoMetadata | null;
     thumbnail_url: string | null;
     failure_reason?: string | null;
   }> {
@@ -207,8 +212,10 @@ export class VideosService {
 
     return {
       public_token: video.public_token,
+      title: video.title,
       status: video.status,
       duration_seconds: video.duration_seconds,
+      metadata: video.metadata,
       thumbnail_url: thumbnailUrl,
       ...(isOwner && video.status === VideoStatus.FAILED
         ? { failure_reason: video.failure_reason }
