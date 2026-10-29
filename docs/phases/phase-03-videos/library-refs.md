@@ -17,7 +17,7 @@ libs:
     context7_id: "/aws/aws-sdk-js-v3/v3.1153.0"
     fetched_at: "2026-10-29T12:51:42-03:00"
 sources_mtime:
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-29T12:51:22-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-29T18:03:51-03:00"
 ---
 
 # phase-03-videos — Library References
@@ -136,16 +136,18 @@ S3 limits: parts of 5 MiB–5 GiB (the last part may be smaller), at most 10,000
 
 ```typescript
 // Upload part (TD-02)
-getSignedUrl(client, new UploadPartCommand({ Bucket, Key, UploadId, PartNumber }), { expiresIn: 3600 });
+getSignedUrl(presignClient, new UploadPartCommand({ Bucket, Key, UploadId, PartNumber }), { expiresIn: 3600 });
 
 // Playback (TD-07): storage answers HTTP Range requests itself
-getSignedUrl(client, new GetObjectCommand({ Bucket, Key }), { expiresIn: 3600 });
+getSignedUrl(presignClient, new GetObjectCommand({ Bucket, Key }), { expiresIn: 3600 });
 
 // Download (TD-07): same GET with a Content-Disposition override
-getSignedUrl(client, new GetObjectCommand({
+getSignedUrl(presignClient, new GetObjectCommand({
   Bucket, Key,
   ResponseContentDisposition: `attachment; filename="${originalFilename}"`,
 }), { expiresIn: 3600 });
 ```
 
-The URL is signed against `STORAGE_ENDPOINT`, so the host baked into the URL must be reachable by whoever uses it.
+The host is part of the SigV4 signature, so a URL cannot be rewritten to another host after signing. `StorageService` therefore keeps two clients with the same credentials: `client` on `STORAGE_ENDPOINT` (`http://storage:9000`) for the API and worker's own calls, and `presignClient` on `STORAGE_PUBLIC_ENDPOINT` (`http://localhost:9000`) for every URL handed to a caller. Signing does no network I/O, so the presign client never needs to reach that host from inside the container.
+
+From the host, a `Range: bytes=0-99` GET on a playback URL returns `206 Partial Content` from MinIO.

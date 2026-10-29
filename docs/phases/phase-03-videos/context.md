@@ -3,8 +3,8 @@ kind: phase
 name: phase-03-videos
 sources_mtime:
   docs/project-plan.md: "2026-10-29T00:00:07-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-29T12:51:22-03:00"
-  docs/phases/phase-03-videos/library-refs.md: "2026-10-29T12:57:42-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-29T18:03:51-03:00"
+  docs/phases/phase-03-videos/library-refs.md: "2026-10-29T18:04:46-03:00"
   docs/phases/phase-01-configuracao-base/context.md: "2026-10-29T00:00:07-03:00"
   docs/phases/phase-02-auth/context.md: "2026-10-29T00:00:07-03:00"
   docs/phases/phase-02-auth-frontend/context.md: "2026-10-29T00:00:07-03:00"
@@ -94,6 +94,7 @@ _Source files:_
 ### phase-03-videos/TD-04
 
 **Recommendation:** the API does not transcode, and the diagram already treats the worker as its own container.
+**Note:** The worker calls `ffprobe -show_format -show_streams -of json` once and stores the duration plus a `metadata` object (format, bitrate, resolution, frame rate, video and audio codecs). FFmpeg grabs the thumbnail frame. Both are system binaries, so no Node wrapper library is added.
 **Libraries:** —
 
 ### phase-03-videos/TD-05
@@ -110,6 +111,7 @@ _Source files:_
 ### phase-03-videos/TD-07
 
 **Recommendation:** playback already points at storage in the diagram, and proxying a 10GB object through Nest fights the same constraint as the upload.
+**Note:** A presigned URL carries the host it was signed for, and the Compose host `storage` does not resolve outside Docker. URLs are signed against `STORAGE_PUBLIC_ENDPOINT` (locally `http://localhost:9000`) when it is set. The API and the worker keep using the internal endpoint for their own calls. The same applies to the TD-02 upload-part URLs.
 **Libraries:** @aws-sdk/s3-request-presigner
 
 ## Inherited Decisions Detail

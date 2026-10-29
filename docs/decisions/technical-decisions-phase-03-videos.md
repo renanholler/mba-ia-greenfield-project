@@ -136,6 +136,7 @@ Context7, checked against the installed NestJS 11 line: `@nestjs/bullmq` registe
 **Recommendation:** **Option A (dedicated worker image)** — the API does not transcode, and the diagram already treats the worker as its own container.
 
 **Decision:** A
+**Note:** The worker calls `ffprobe -show_format -show_streams -of json` once and stores the duration plus a `metadata` object (format, bitrate, resolution, frame rate, video and audio codecs). FFmpeg grabs the thumbnail frame. Both are system binaries, so no Node wrapper library is added.
 
 ---
 
@@ -229,6 +230,7 @@ Choice B overrides the recommendation. The public path segment is a separate opa
 
 **Decision:** A
 **Libraries:** @aws-sdk/s3-request-presigner
+**Note:** A presigned URL carries the host it was signed for, and the Compose host `storage` does not resolve outside Docker. URLs are signed against `STORAGE_PUBLIC_ENDPOINT` (locally `http://localhost:9000`) when it is set. The API and the worker keep using the internal endpoint for their own calls. The same applies to the TD-02 upload-part URLs.
 
 ---
 

@@ -37,6 +37,8 @@ Inside a container, `localhost` refers to the container itself, not the host mac
 
 This applies to all environment variables, configuration files, and code that references service hosts.
 
+The one exception is a URL handed to a client outside Docker, which must use a host that client can reach. `STORAGE_PUBLIC_ENDPOINT` (`http://localhost:9000`) is only used to sign presigned storage URLs for the browser; server-to-storage calls still use `STORAGE_ENDPOINT=http://storage:9000`.
+
 ## Working Principles
 
 - **Single Responsibility:** each module, service, and function should have a clear, focused responsibility. Re-evaluate adherence at every step — when a module starts owning logic or entities that are not its own (e.g., a service creating an entity from another domain), extract it immediately into the proper module instead of deferring to a later corrective task.

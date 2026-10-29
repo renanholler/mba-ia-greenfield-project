@@ -29,12 +29,17 @@ Deliver upload de até 10GB funcional, processamento automático do vídeo, stre
 **Technical actions:**
 
 1. Instalar `@nestjs/bullmq` em `nestjs-project` (per `phase-03-videos/TD-01`).
-2. Criar `src/config/storage.config.ts` — `registerAs('storage', ...)` com endpoint, credenciais e dois nomes de bucket, um para o objeto de vídeo e outro para o thumbnail (per `phase-03-videos/TD-03`, `phase-01-configuracao-base/TD-03`).
+2. Criar `src/config/storage.config.ts` — `registerAs('storage', ...)` com endpoint, endpoint público opcional, credenciais e dois nomes de bucket, um para o objeto de vídeo e outro para o thumbnail. O endpoint interno é o nome do serviço Compose; o endpoint público (`STORAGE_PUBLIC_ENDPOINT`) é o host que o cliente alcança e só entra na assinatura das URLs (per `phase-03-videos/TD-02`, `phase-03-videos/TD-03`, `phase-03-videos/TD-07`, `phase-01-configuracao-base/TD-03`).
 3. Criar `src/config/queue.config.ts` — `registerAs('queue', ...)` com o host do broker, distinto do Postgres de auth (per `phase-03-videos/TD-01`, `phase-01-configuracao-base/TD-01`).
 4. Estender `src/config/env.validation.ts` com Joi para as variáveis novas (per `phase-01-configuracao-base/TD-02`) e registrar `BullModule.forRoot` a partir de `queueConfig`.
-5. Adicionar ao `compose.yaml` três serviços na rede interna: object storage compatível com S3, broker da fila, e um container dedicado com FFmpeg cujo comando não é o da API (per `phase-03-videos/TD-04`). Entre serviços, o host é o nome do serviço Compose.
+5. Adicionar ao `compose.yaml` três serviços na rede interna: object storage compatível com S3, broker da fila, e um container dedicado com FFmpeg cujo comando não é o da API, com `restart: unless-stopped` para voltar sozinho se subir antes das dependências (per `phase-03-videos/TD-04`). Entre serviços, o host é o nome do serviço Compose.
 
-**Tests:** _(empty — Infra)_
+**Tests:**
+
+| Artifact | Layer | Test file |
+|----------|-------|-----------|
+| `StorageService` presigning | Unit: public vs internal endpoint | `src/videos/storage/storage.service.spec.ts` |
+| `VideosWorkerModule` | Integration: worker DataSource resolves every entity `Video` relates to | `src/videos/videos-worker.module.integration-spec.ts` |
 
 **Dependencies:** none
 
@@ -44,6 +49,7 @@ Deliver upload de até 10GB funcional, processamento automático do vídeo, stre
 - `compose.yaml` declara object storage, broker da fila e worker FFmpeg como serviços distintos de `nestjs-api`
 - O host do broker na config é o nome do serviço Compose do broker, não `localhost` e não o serviço Postgres
 - A config de storage expõe dois nomes de bucket distintos
+- URLs pré-assinadas usam `STORAGE_PUBLIC_ENDPOINT` quando definido e caem no endpoint interno quando não
 
 ---
 
@@ -53,9 +59,9 @@ Deliver upload de até 10GB funcional, processamento automático do vídeo, stre
 
 **Technical actions:**
 
-1. Criar `src/videos/entities/video.entity.ts` — `@Entity('videos')` com os campos de `### Data Model` → `Video`: `id`, `public_token`, `channel_id`, `status`, `original_filename`, `content_type`, `size_bytes`, `object_key`, `thumbnail_object_key`, `duration_seconds`, `multipart_upload_id`, `failure_reason`, `created_at`, `updated_at` (per `phase-03-videos/TD-05`, `phase-03-videos/TD-06`).
+1. Criar `src/videos/entities/video.entity.ts` — `@Entity('videos')` com os campos de `### Data Model` → `Video`: `id`, `public_token`, `channel_id`, `status`, `title`, `original_filename`, `content_type`, `size_bytes`, `object_key`, `thumbnail_object_key`, `duration_seconds`, `metadata`, `multipart_upload_id`, `failure_reason`, `created_at`, `updated_at` (per `phase-03-videos/TD-05`, `phase-03-videos/TD-06`).
 2. Declarar `@ManyToOne` de `Video` para `Channel` via `channel_id`.
-3. Gerar a migration `CreateVideos` e conferir PK em `id`, unique em `public_token`, FK em `channel_id`, e nulabilidade de `thumbnail_object_key`, `duration_seconds`, `multipart_upload_id` e `failure_reason`.
+3. Gerar a migration `CreateVideos` e conferir PK em `id`, unique em `public_token`, FK em `channel_id`, e nulabilidade de `thumbnail_object_key`, `duration_seconds`, `metadata`, `multipart_upload_id` e `failure_reason`.
 4. Criar `src/videos/videos.module.ts` com `TypeOrmModule.forFeature([Video])` e exportar o repositório.
 
 **Tests:**
@@ -70,7 +76,7 @@ Deliver upload de até 10GB funcional, processamento automático do vídeo, stre
 
 - Inserir um `Video` com `channel_id` de um canal existente persiste `status` default `draft`, `id` uuid gerado e `public_token` opaco distinto desse `id`
 - Inserir um `Video` com `channel_id` inexistente falha na FK
-- `thumbnail_object_key`, `duration_seconds`, `multipart_upload_id` e `failure_reason` aceitam null no insert inicial
+- `thumbnail_object_key`, `duration_seconds`, `metadata`, `multipart_upload_id` e `failure_reason` aceitam null no insert inicial
 - Dois vídeos podem existir; cada `public_token` é único e é o segmento público da URL. O `id` não entra na rota (per `phase-03-videos/TD-06`)
 
 ---
@@ -85,7 +91,7 @@ Deliver upload de até 10GB funcional, processamento automático do vídeo, stre
 
 **Technical actions:**
 
-1. Criar `InitiateUploadDto` com `original_filename`, `content_type` e `size_bytes`, validados por class-validator (per `phase-02-auth/TD-06`).
+1. Criar `InitiateUploadDto` com `title`, `original_filename`, `content_type` e `size_bytes`, validados por class-validator (per `phase-02-auth/TD-06`).
 2. No serviço, rejeitar `size_bytes` acima de 10GB com `UPLOAD_TOO_LARGE` e criar a linha `Video` em `status = draft` ligada ao canal do caller (per `phase-03-videos/TD-02`, `phase-03-videos/TD-05`).
 3. Abrir o multipart no bucket de vídeo e gravar `multipart_upload_id` e `object_key` na mesma transação do rascunho.
 4. Expor `POST /videos/uploads` no controller, atrás do guard de access token da Fase 02, respondendo `201` com `public_token`, `status` e `multipart_upload_id`. O `id` uuid não sai na resposta.
@@ -102,11 +108,12 @@ Deliver upload de até 10GB funcional, processamento automático do vídeo, stre
 
 **Acceptance criteria:**
 
-- `POST /videos/uploads` autenticado com `{ original_filename, content_type, size_bytes }` válidos retorna `201` com `public_token` opaco, `status: "draft"` e `multipart_upload_id`. O corpo não traz o `id` uuid
+- `POST /videos/uploads` autenticado com `{ title, original_filename, content_type, size_bytes }` válidos retorna `201` com `public_token` opaco, `status: "draft"` e `multipart_upload_id`. O corpo não traz o `id` uuid
 - A linha criada tem `channel_id` do canal do caller e `thumbnail_object_key` e `duration_seconds` nulos
 - `POST /videos/uploads` com `size_bytes` acima de 10GB retorna `400` com `error: "UPLOAD_TOO_LARGE"` e não insere linha
 - `POST /videos/uploads` sem access token retorna `401`
 - `POST /videos/uploads` com `original_filename` vazio retorna `400` com `error: "VALIDATION_ERROR"`
+- `POST /videos/uploads` sem `title` retorna `400` com `error: "VALIDATION_ERROR"` e não cria linha
 
 ---
 
@@ -186,7 +193,7 @@ Deliver upload de até 10GB funcional, processamento automático do vídeo, stre
 **Technical actions:**
 
 1. Criar o consumer `video.processing` no processo do worker, lendo `{ "videoId": "uuid" }` (per `phase-03-videos/TD-01`, `phase-03-videos/TD-04`).
-2. No sucesso, gravar `duration_seconds`, escrever um frame no bucket de thumbnail em `thumbnail_object_key` e setar `status = ready`.
+2. No sucesso, gravar `duration_seconds` e `metadata` (formato, bitrate, resolução, frame rate e codecs lidos pelo `ffprobe`), escrever um frame no bucket de thumbnail em `thumbnail_object_key` e setar `status = ready`.
 3. No fracasso, relançar o erro enquanto houver tentativas para a fila refazer o job. Na última tentativa, setar `status = failed` e `failure_reason`, mantendo `object_key` no bucket de vídeo (per `phase-03-videos/TD-05`).
 4. Tratar reentrega at-least-once: se o vídeo já está `ready` ou `failed`, o consumer não reprocessa o objeto.
 5. Subir o worker pelo comando do serviço Compose dedicado, não pelo comando da API (per `phase-03-videos/TD-04`).
@@ -196,13 +203,14 @@ Deliver upload de até 10GB funcional, processamento automático do vídeo, stre
 | Artifact | Layer | Test file |
 |----------|-------|-----------|
 | `VideoProcessor` | Unit: branch logic (mock repo) | `src/videos/video.processor.spec.ts` |
+| `parseProbeOutput` | Unit: ffprobe JSON → duration + metadata | `src/videos/video-media.service.spec.ts` |
 | `VideoProcessor` | Integration: DB contract | `src/videos/video.processor.integration-spec.ts` |
 
 **Dependencies:** SI-03.1 + SI-03.2
 
 **Acceptance criteria:**
 
-- Um job `video.processing` de um vídeo em `processing` termina com `status = ready`, `duration_seconds` preenchido e `thumbnail_object_key` apontando para o bucket de thumbnail
+- Um job `video.processing` de um vídeo em `processing` termina com `status = ready`, `duration_seconds` e `metadata` preenchidos e `thumbnail_object_key` apontando para o bucket de thumbnail
 - Uma tentativa que falha na extração, com tentativas restantes, relança o erro e mantém `status = processing`
 - Um job que falha na extração na última tentativa termina com `status = failed`, `failure_reason` preenchido e o objeto de vídeo ainda no bucket
 - Reentregar o job de um vídeo já `ready` não altera `duration_seconds` nem `thumbnail_object_key`
@@ -221,7 +229,7 @@ Deliver upload de até 10GB funcional, processamento automático do vídeo, stre
 **Technical actions:**
 
 1. No serviço, retornar `404 VIDEO_NOT_FOUND` quando o `public_token` não existe, quando o caminho traz o uuid interno, ou quando o caller não é o dono e `status` não é `ready` (per `phase-03-videos/TD-06`).
-2. Montar a resposta `200` com `public_token`, `status`, `duration_seconds`, `thumbnail_url` e, só para o dono em `failed`, `failure_reason`. O `id` uuid não sai na resposta.
+2. Montar a resposta `200` com `public_token`, `title`, `status`, `duration_seconds`, `metadata`, `thumbnail_url` e, só para o dono em `failed`, `failure_reason`. O `id` uuid não sai na resposta.
 3. Gerar `thumbnail_url` como GET pré-assinado do bucket de thumbnail quando `thumbnail_object_key` está preenchido; senão `null` (per `phase-03-videos/TD-03`, `phase-03-videos/TD-07`).
 4. Expor `GET /videos/:publicToken` sem exigir access token. Se o token vier, resolver o dono para a regra de visibilidade.
 
@@ -236,7 +244,7 @@ Deliver upload de até 10GB funcional, processamento automático do vídeo, stre
 
 **Acceptance criteria:**
 
-- `GET /videos/:publicToken` sem token, com o vídeo `ready`, retorna `200` com `public_token`, `status: "ready"`, `duration_seconds` e `thumbnail_url` quando `thumbnail_object_key` existe. O corpo não traz o `id` uuid
+- `GET /videos/:publicToken` sem token, com o vídeo `ready`, retorna `200` com `public_token`, `title`, `status: "ready"`, `duration_seconds`, `metadata` e `thumbnail_url` quando `thumbnail_object_key` existe. O corpo não traz o `id` uuid
 - `GET /videos/:publicToken` sem token, com o vídeo em `draft`, `processing` ou `failed`, retorna `404` com `error: "VIDEO_NOT_FOUND"`
 - `GET /videos/:publicToken` do dono, com o vídeo `failed`, retorna `200` com `failure_reason` preenchido
 - `GET /videos/:publicToken` com `publicToken` inexistente retorna `404` com `error: "VIDEO_NOT_FOUND"`
@@ -320,12 +328,14 @@ Deliver upload de até 10GB funcional, processamento automático do vídeo, stre
 | public_token | varchar(64) | not null, unique. Random opaque token, generated at insert, distinct from `id`. Public URL segment (per phase-03-videos/TD-06, decision B) |
 | channel_id | uuid | not null, FK → channels.id. Owning channel from Phase 02 |
 | status | varchar | not null. `draft` at initiate; `processing` only after multipart complete; `ready` when the worker finishes; `failed` keeps the object (per phase-03-videos/TD-05) |
+| title | varchar(255) | not null. Sent by the uploader at initiate |
 | original_filename | varchar(255) | not null. Used as the download Content-Disposition name (per phase-03-videos/TD-07) |
 | content_type | varchar(255) | not null |
 | size_bytes | bigint | not null. At most 10GB |
 | object_key | varchar(1024) | not null. Object in the video bucket |
 | thumbnail_object_key | varchar(1024) | nullable until the worker writes a frame |
 | duration_seconds | integer | nullable until the worker extracts duration |
+| metadata | jsonb | nullable until the worker probes the file. `{ format_name, bit_rate, width, height, frame_rate, video_codec, audio_codec }`, each field nullable when the stream lacks it (per phase-03-videos/TD-04) |
 | multipart_upload_id | varchar(1024) | nullable. Set at initiate; cleared after complete |
 | failure_reason | text | nullable. Set when status becomes `failed` |
 | created_at | timestamptz | not null, default now() |
@@ -334,7 +344,7 @@ Deliver upload de até 10GB funcional, processamento automático do vídeo, stre
 **Relations:** `Channel` has many `Video` (one-to-many, via `channel_id`)
 **Indexes:** unique on `id` (primary key). Unique on `public_token`. Index on `channel_id`.
 
-**Storage layout:** two private buckets, one per artifact, distinguished by bucket name — the video object and the thumbnail object do not share a bucket (per phase-03-videos/TD-03). The API does not store bytes. The client writes the video object with presigned multipart URLs (per phase-03-videos/TD-02). The worker writes the thumbnail object.
+**Storage layout:** two private buckets, one per artifact, distinguished by bucket name — the video object and the thumbnail object do not share a bucket (per phase-03-videos/TD-03). The API does not store bytes. The client writes the video object with presigned multipart URLs (per phase-03-videos/TD-02). The worker writes the thumbnail object. Every presigned URL is signed against `STORAGE_PUBLIC_ENDPOINT` when it is set, because the internal Compose host (`storage`) does not resolve outside Docker; the API and worker still talk to storage through the internal endpoint (per phase-03-videos/TD-02, phase-03-videos/TD-07).
 
 ### API Contracts
 
@@ -345,6 +355,7 @@ Deliver upload de até 10GB funcional, processamento automático do vídeo, stre
 - Authorization: Bearer access token
 
 **Request body:**
+- title: string, required — non-empty, max 255 characters
 - original_filename: string, required — non-empty, max 255 characters
 - content_type: string, required — non-empty, max 255 characters
 - size_bytes: integer, required — greater than 0 and at most 10GB
@@ -411,8 +422,10 @@ Deliver upload de até 10GB funcional, processamento automático do vídeo, stre
 
 **Response 200:**
 - public_token: string — the opaque token from the route. The primary key is not returned
+- title: string
 - status: `draft` | `processing` | `ready` | `failed`
 - duration_seconds: integer | null
+- metadata: object | null — `{ format_name, bit_rate, width, height, frame_rate, video_codec, audio_codec }` once the worker has probed the file
 - thumbnail_url: string | null — short-lived presigned GET for the thumbnail bucket when `thumbnail_object_key` is set; otherwise null (per phase-03-videos/TD-03, phase-03-videos/TD-07)
 - failure_reason: string | null — present for the owner when status is `failed`; omitted for other callers
 
